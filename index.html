@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BIP-39 Mnemonic Generator - Pi Compatible</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
             text-align: center;
@@ -18,6 +19,7 @@
             border-radius: 8px;
             padding: 30px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         h1 {
             color: #333;
@@ -31,9 +33,14 @@
             border: none;
             border-radius: 4px;
             transition: background-color 0.3s;
+            margin: 5px;
         }
         button:hover {
             background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         #mnemonic {
             margin-top: 20px;
@@ -65,6 +72,86 @@
             border-radius: 4px;
             text-align: left;
         }
+        .bulk-section {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff8e1;
+            border-radius: 4px;
+            text-align: left;
+        }
+        #bulkCount {
+            padding: 8px;
+            font-size: 16px;
+            width: 100px;
+        }
+        .preset-buttons {
+            margin: 10px 0;
+        }
+        .preset-btn {
+            padding: 8px 12px;
+            font-size: 14px;
+            margin: 5px;
+            background-color: #2196F3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+            text-align: center;
+            color: white;
+            line-height: 20px;
+        }
+        .export-options {
+            margin-top: 15px;
+            display: none;
+        }
+        .export-btn {
+            background-color: #FF9800;
+        }
+        .export-btn:hover {
+            background-color: #e68900;
+        }
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
@@ -72,26 +159,68 @@
         <h1>BIP-39 Mnemonic Generator</h1>
         <p>Generate a 24-word BIP-39 compliant mnemonic phrase</p>
         <button id="generateBtn">Generate Mnemonic</button>
-        <div id="mnemonic"></div>
-        <div class="warning">⚠️ Never share your mnemonic phrase with anyone! Store it securely offline.</div>
+        <div id="mnemonic"></div>             
+      </div>
+
+    <div class="container bulk-section">
+        <h3>Bulk Generation</h3>
+        <p>Generate multiple mnemonics at once (max 5000)</p>
+        <input type="number" id="bulkCount" min="1" max="5000" value="1000">
+        <button id="generateBulkBtn">Generate Bulk</button>
         
-        <div class="pi-info">
-            <h3>Pi Network Compatibility</h3>
-            <p>The mnemonic generated here is fully compatible with Pi Network wallets. You can use this phrase to import or restore your Pi wallet.</p>
+        <div class="preset-buttons">
+            <button class="preset-btn" onclick="setBulkCount(100)">100</button>
+            <button class="preset-btn" onclick="setBulkCount(500)">500</button>
+            <button class="preset-btn" onclick="setBulkCount(1000)">1000</button>
+            <button class="preset-btn" onclick="setBulkCount(2000)">2000</button>
+            <button class="preset-btn" onclick="setBulkCount(5000)">5000</button>
         </div>
         
-        <div class="instructions">
-            <h3>How to use:</h3>
-            <ol>
-                <li>Click "Generate Mnemonic" to create a new 24-word phrase</li>
-                <li>Write down the words and store them in a secure location</li>
-                <li>This phrase is the only way to recover your wallet</li>
-                <li>Do not store it digitally or share it online</li>
-            </ol>
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar" id="progressBar">0%</div>
+        </div>
+        
+        <div class="export-options" id="exportOptions">
+            <h4>Export Options:</h4>
+            <button class="export-btn" id="exportExcelBtn">Export to Excel</button>
+            <button class="export-btn" id="exportCsvBtn">Export to CSV</button>
+            <button class="export-btn" id="exportJsonBtn">Export to JSON</button>
+        </div>
+        
+        <div class="table-container">
+            <table id="bulkTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Mnemonic Phrase</th>
+                    </tr>
+                </thead>
+                <tbody id="bulkTableBody">
+                </tbody>
+            </table>
         </div>
     </div>
 
+    <div class="notification" id="notification"></div>
+
     <script>
+        // Show notification
+        function showNotification(message, duration = 3000) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, duration);
+        }
+
+        // Set bulk count
+        function setBulkCount(count) {
+            document.getElementById('bulkCount').value = count;
+        }
+
+        // Single mnemonic generation
         document.getElementById('generateBtn').addEventListener('click', async () => {
             const mnemonicDiv = document.getElementById('mnemonic');
             mnemonicDiv.innerText = 'Generating...';
@@ -108,6 +237,151 @@
             } catch (error) {
                 mnemonicDiv.innerText = 'Error: ' + error.message;
             }
+        });
+
+        // Bulk mnemonic generation
+        let bulkMnemonics = [];
+        document.getElementById('generateBulkBtn').addEventListener('click', async () => {
+            const count = document.getElementById('bulkCount').value;
+            const table = document.getElementById('bulkTable');
+            const tableBody = document.getElementById('bulkTableBody');
+            const exportOptions = document.getElementById('exportOptions');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            
+            // Clear previous results
+            tableBody.innerHTML = '';
+            bulkMnemonics = [];
+            exportOptions.style.display = 'none';
+            table.style.display = 'none';
+            
+            // Show progress bar
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            
+            try {
+                // For large counts, we'll generate in batches to avoid browser freezing
+                const batchSize = 100;
+                const batches = Math.ceil(count / batchSize);
+                let completedBatches = 0;
+                
+                for (let i = 0; i < batches; i++) {
+                    const currentBatchSize = Math.min(batchSize, count - i * batchSize);
+                    const response = await fetch(`/api/generate-bulk?count=${currentBatchSize}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        bulkMnemonics.push(...data.mnemonics);
+                        completedBatches++;
+                        
+                        // Update progress
+                        const progress = Math.round((completedBatches / batches) * 100);
+                        progressBar.style.width = progress + '%';
+                        progressBar.textContent = progress + '%';
+                        
+                        // Add to table
+                        data.mnemonics.forEach((mnemonic, index) => {
+                            const globalIndex = (i * batchSize) + index;
+                            const row = tableBody.insertRow();
+                            const cell1 = row.insertCell(0);
+                            const cell2 = row.insertCell(1);
+                            cell1.textContent = globalIndex + 1;
+                            cell2.textContent = mnemonic;
+                        });
+                    } else {
+                        throw new Error(data.error);
+                    }
+                }
+                
+                // Hide progress bar and show results
+                progressContainer.style.display = 'none';
+                table.style.display = 'table';
+                exportOptions.style.display = 'block';
+                
+                showNotification(`Successfully generated ${count} mnemonics!`);
+            } catch (error) {
+                progressContainer.style.display = 'none';
+                alert('Error: ' + error.message);
+            }
+        });
+
+        // Export to Excel
+        document.getElementById('exportExcelBtn').addEventListener('click', () => {
+            if (bulkMnemonics.length === 0) {
+                alert('No mnemonics to export');
+                return;
+            }
+            
+            // Create a workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Convert the mnemonics array to a worksheet
+            const wsData = bulkMnemonics.map((mnemonic, index) => [index + 1, mnemonic]);
+            const ws = XLSX.utils.aoa_to_sheet([['#', 'Mnemonic Phrase'], ...wsData]);
+            
+            // Add the worksheet to the workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Mnemonics');
+            
+            // Generate the Excel file and trigger download
+            XLSX.writeFile(wb, `mnemonics_${bulkMnemonics.length}.xlsx`);
+            
+            showNotification('Excel file exported successfully!');
+        });
+
+        // Export to CSV
+        document.getElementById('exportCsvBtn').addEventListener('click', () => {
+            if (bulkMnemonics.length === 0) {
+                alert('No mnemonics to export');
+                return;
+            }
+            
+            // Create CSV content
+            let csvContent = '"#","Mnemonic Phrase"\n';
+            bulkMnemonics.forEach((mnemonic, index) => {
+                csvContent += `"${index + 1}","${mnemonic}"\n`;
+            });
+            
+            // Create a blob and trigger download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `mnemonics_${bulkMnemonics.length}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showNotification('CSV file exported successfully!');
+        });
+
+        // Export to JSON
+        document.getElementById('exportJsonBtn').addEventListener('click', () => {
+            if (bulkMnemonics.length === 0) {
+                alert('No mnemonics to export');
+                return;
+            }
+            
+            // Create JSON content
+            const jsonData = {
+                count: bulkMnemonics.length,
+                generatedAt: new Date().toISOString(),
+                mnemonics: bulkMnemonics
+            };
+            
+            // Create a blob and trigger download
+            const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `mnemonics_${bulkMnemonics.length}.json`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showNotification('JSON file exported successfully!');
         });
     </script>
 </body>
