@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIP-39 Mnemonic Generator - Pi Compatible</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #mnemonic {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            word-break: break-all;
+            text-align: left;
+            font-family: monospace;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        .warning {
+            color: #d32f2f;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .instructions {
+            margin-top: 30px;
+            text-align: left;
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .pi-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e3f2fd;
+            border-radius: 4px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>BIP-39 Mnemonic Generator</h1>
+        <p>Generate a 24-word BIP-39 compliant mnemonic phrase</p>
+        <button id="generateBtn">Generate Mnemonic</button>
+        <div id="mnemonic"></div>
+        <div class="warning">⚠️ Never share your mnemonic phrase with anyone! Store it securely offline.</div>
+        
+        <div class="pi-info">
+            <h3>Pi Network Compatibility</h3>
+            <p>The mnemonic generated here is fully compatible with Pi Network wallets. You can use this phrase to import or restore your Pi wallet.</p>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to use:</h3>
+            <ol>
+                <li>Click "Generate Mnemonic" to create a new 24-word phrase</li>
+                <li>Write down the words and store them in a secure location</li>
+                <li>This phrase is the only way to recover your wallet</li>
+                <li>Do not store it digitally or share it online</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            const mnemonicDiv = document.getElementById('mnemonic');
+            mnemonicDiv.innerText = 'Generating...';
+            
+            try {
+                const response = await fetch('/api/generate');
+                const data = await response.json();
+                
+                if (data.success) {
+                    mnemonicDiv.innerText = data.mnemonic;
+                } else {
+                    mnemonicDiv.innerText = 'Error: ' + data.error;
+                }
+            } catch (error) {
+                mnemonicDiv.innerText = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
